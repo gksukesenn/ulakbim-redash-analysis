@@ -1,0 +1,50 @@
+{
+  "collection": "publications",
+  "aggregate": [
+    {
+      "$group": {
+        "_id": "$journal_gold_open_access",
+        "yayin_sayisi": {
+          "$sum": 1
+        }
+      }
+    },
+    {
+      "$project": {
+        "_id": 0,
+        "gold_oa_durumu": {
+          "$cond": [
+            {
+              "$eq": [
+                "$_id",
+                true
+              ]
+            },
+            "Gold OA Dergi",
+            {
+              "$cond": [
+                {
+                  "$eq": [
+                    "$_id",
+                    false
+                  ]
+                },
+                "Gold OA Değil",
+                "Bilinmiyor"
+              ]
+            }
+          ]
+        },
+        "yayin_sayisi": 1
+      }
+    },
+    {
+      "$sort": [
+        {
+          "name": "yayin_sayisi",
+          "direction": -1
+        }
+      ]
+    }
+  ]
+}

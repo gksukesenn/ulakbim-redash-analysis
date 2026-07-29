@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ulakbim-redash-analysis"
+version = "0.1.0"
+description = "ULAKBIM Web of Science records analysis pipeline"
+requires-python = ">=3.8"
+dependencies = [
+    "ijson>=3.3,<4",
+    "pymongo>=4.6,<5",
+    "python-dotenv>=1.0,<2",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.4,<9",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+pythonpath = ["src"]

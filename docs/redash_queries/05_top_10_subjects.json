@@ -1,0 +1,49 @@
+{
+  "collection": "publications",
+  "aggregate": [
+    {
+      "$unwind": "$subjects"
+    },
+    {
+      "$match": {
+        "subjects": {
+          "$nin": [null, ""]
+        }
+      }
+    },
+    {
+      "$group": {
+        "_id": "$subjects",
+        "yayin_sayisi": {
+          "$sum": 1
+        }
+      }
+    },
+    {
+      "$sort": [
+        {
+          "name": "yayin_sayisi",
+          "direction": -1
+        }
+      ]
+    },
+    {
+      "$limit": 10
+    },
+    {
+      "$sort": [
+        {
+          "name": "yayin_sayisi",
+          "direction": 1
+        }
+      ]
+    },
+    {
+      "$project": {
+        "_id": 0,
+        "konu": "$_id",
+        "yayin_sayisi": 1
+      }
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+# Python sanal ortamı
+.venv/
+
+# Python tarafından üretilen geçici dosyalar
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Ortam değişkenleri ve parolalar
+.env
+
+# Büyük ve ham veri dosyaları
+data/raw/*
+
+# İşlenmiş veya geçici veriler
+data/processed/
+data/temp/
+
+# Editör dosyaları
+.vscode/
+.idea/
+
+# İşletim sistemi dosyaları
+.DS_Store

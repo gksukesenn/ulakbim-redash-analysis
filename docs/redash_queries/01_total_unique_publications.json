@@ -1,0 +1,8 @@
+{
+  "collection": "publications",
+  "aggregate": [
+    {
+      "$count": "toplam_yayin"
+    }
+  ]
+}
