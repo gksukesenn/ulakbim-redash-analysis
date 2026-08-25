@@ -63,6 +63,21 @@ def validate_mapping(
         if publication.journal_gold_open_access is None:
             statistics["bilinmeyen_gold_oa"] += 1
 
+        if publication.abstract is None:
+            statistics["eksik_abstract"] += 1
+
+        if publication.abstract_is_suspicious:
+            statistics["supheli_abstract"] += 1
+
+        actual_abstract_length = (
+            len(publication.abstract)
+            if publication.abstract is not None
+            else 0
+        )
+
+        if publication.abstract_length != actual_abstract_length:
+            statistics["abstract_uzunluk_hatasi"] += 1
+
         if not publication.institutions:
             statistics["eksik_kurum"] += 1
 
@@ -99,7 +114,16 @@ def validate_mapping(
         "eksik_dokuman_turu": "Eksik doküman türü",
         "eksik_dil": "Eksik dil",
         "eksik_anahtar_kelime": "Eksik anahtar kelime",
+        "eksik_abstract": "Eksik abstract",
+        "supheli_abstract": "Şüpheli abstract",
+        "abstract_uzunluk_hatasi": "Abstract uzunluk hatası",
     }
 
     for key, label in labels.items():
         print(f"{label}: {statistics[key]}")
+
+
+if __name__ == "__main__":
+    validate_mapping(
+        Path("data/raw/ulakbim_ubyt_wos_records.json")
+    )

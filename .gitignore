@@ -5,6 +5,11 @@
 __pycache__/
 *.py[cod]
 *.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+*.log
 
 # Ortam değişkenleri ve parolalar
 .env
@@ -15,6 +20,27 @@ data/raw/*
 # İşlenmiş veya geçici veriler
 data/processed/
 data/temp/
+
+# Yerel model, embedding ve vektör indeksleri
+models/
+embeddings/
+vector_indexes/
+qdrant_storage/
+qdrant_data/
+.qdrant/
+*.onnx
+*.safetensors
+*.faiss
+*.index
+
+# Veritabanı ve Docker volume verileri
+mongo_data/
+mongodb_data/
+postgres_data/
+postgresql_data/
+redash_postgres_data/
+docker-volumes/
+volumes/
 
 # Editör dosyaları
 .vscode/

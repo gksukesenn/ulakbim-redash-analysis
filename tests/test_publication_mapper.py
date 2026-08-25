@@ -6,6 +6,7 @@ from ulakbim_analysis.infrastructure.publication_mapper import (
     as_list,
     clean_text,
     extract_document_types,
+    extract_abstract,
     extract_institutions,
     extract_keywords,
     extract_languages,
@@ -16,6 +17,9 @@ from ulakbim_analysis.infrastructure.publication_mapper import (
     parse_gold_open_access,
     parse_publication_year,
     unique_texts,
+)
+from ulakbim_analysis.domain.publication import (
+    ABSTRACT_SUSPICIOUS_LENGTH_THRESHOLD,
 )
 
 
@@ -114,6 +118,22 @@ def test_extract_keywords_supports_dict_and_string() -> None:
     assert extract_keywords(value) == ["data", "streaming"]
 
 
+def test_extract_abstract_supports_single_paragraph() -> None:
+    value = {"abstract": {"abstract_text": {"p": "  Tek paragraf.  "}}}
+
+    assert extract_abstract(value) == "Tek paragraf."
+
+
+def test_extract_abstract_supports_paragraph_list() -> None:
+    value = {
+        "abstract": {
+            "abstract_text": {"p": [" İlk paragraf. ", "İkinci paragraf."]}
+        }
+    }
+
+    assert extract_abstract(value) == "İlk paragraf. İkinci paragraf."
+
+
 @pytest.mark.parametrize(
     "value, expected",
     [
@@ -156,3 +176,42 @@ def test_map_publication(raw_publication: Dict[str, Any]) -> None:
     assert publication.document_types == ["Article", "Review"]
     assert publication.languages == ["English"]
     assert publication.keywords == ["data", "streaming"]
+
+
+def _set_abstract(raw_publication: Dict[str, Any], paragraph: Any) -> None:
+    metadata = raw_publication["static_data"]["fullrecord_metadata"]
+    metadata["abstracts"] = {
+        "abstract": {"abstract_text": {"p": paragraph}}
+    }
+
+
+def test_map_publication_without_abstract(
+    raw_publication: Dict[str, Any],
+) -> None:
+    publication = map_publication(raw_publication)
+
+    assert publication.abstract is None
+    assert publication.abstract_length == 0
+    assert publication.abstract_is_suspicious is False
+
+
+@pytest.mark.parametrize(
+    "length, expected_suspicious",
+    [
+        (ABSTRACT_SUSPICIOUS_LENGTH_THRESHOLD, False),
+        (ABSTRACT_SUSPICIOUS_LENGTH_THRESHOLD + 1, True),
+    ],
+)
+def test_map_publication_abstract_suspicious_boundary(
+    raw_publication: Dict[str, Any],
+    length: int,
+    expected_suspicious: bool,
+) -> None:
+    _set_abstract(raw_publication, "a" * length)
+
+    publication = map_publication(raw_publication)
+
+    assert publication.abstract is not None
+    assert publication.abstract_length == len(publication.abstract)
+    assert publication.abstract_length == length
+    assert publication.abstract_is_suspicious is expected_suspicious

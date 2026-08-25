@@ -249,6 +249,115 @@ PYTHONPATH=src python -m ulakbim_analysis.main validate --limit 1000
 Farklı bir dosya kullanılacaksa `inspect`, `validate` veya `import` komutuna
 `--file DOSYA_YOLU` eklenebilir.
 
+Abstract doğrulaması için iki farklı komut vardır:
+
+```bash
+# Hızlı kontrol: varsayılan olarak yalnız ilk 1.000 kaydı doğrular.
+PYTHONPATH=src python -m ulakbim_analysis.application.validate_mapping
+
+# Tam analiz: veri setinin tamamını streaming okuyup abstract kalitesini raporlar.
+PYTHONPATH=src python -m ulakbim_analysis.application.analyze_all_abstracts
+```
+
+Tam analiz JSON dosyasını belleğe bütünüyle yüklemez. Kesin medyanı hesaplamak
+için abstract metinleri yerine yalnız normal abstract uzunluklarını tam sayı
+olarak bellekte tutar ve her 10.000 kayıtta ilerlemeyi gösterir.
+
+## Küçük vektör benzerliği deneyi
+
+Bu öğrenme deneyi bütün veri setini işlemek yerine önceden açıklanmış UID'lerle
+seçilmiş 24 makale kullanır. Sekizer makalelik gruplar aynı dar konu
+(perovskit güneş hücreleri), yakın genel alan (batarya, süperkapasitör ve diğer
+fotovoltaik teknolojiler) ve tamamen farklı alan (depresyon ve anksiyete)
+örnekleri sağlar. Abstract'ı olmayan veya `abstract_is_suspicious=True` olan
+kayıtlar seçim listesinde bulunsa bile embedding'e alınmaz.
+
+### Embedding ve model seçimi
+
+Embedding, bir metnin anlamla ilgili özelliklerini sabit uzunluklu bir sayı
+listesiyle temsil eder. Bu deney her makaleyi şu açık şablonla hazırlar:
+
+```text
+Başlık: <makale başlığı>
+Abstract: <makale abstract'ı>
+```
+
+Yerel model
+[`sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`](https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2)
+cümle ve paragrafları semantik arama ve kümeleme için 384 boyutlu yoğun
+vektörlere dönüştürür. Model kartına göre 50 dili destekler ve Apache-2.0
+lisanslıdır; dolayısıyla ticari kullanıma engel olan non-commercial kısıtı
+yoktur. FastEmbed'in ONNX tabanlı CPU çalıştırıcısında yaklaşık 220 MB olması,
+API anahtarı gerektirmemesi ve daha büyük çok dilli modellere göre kolay
+çalıştırılması bu küçük deney için tercih nedenidir. FastEmbed paketindeki bu
+ONNX modelinin 512 token giriş
+sınırı nedeniyle uzun abstract'ların kesilebileceği, sonuç değerlendirmesinde
+dikkate alınmalıdır.
+
+Deney bağımlılıklarını kurun:
+
+```bash
+python -m pip install -e '.[vector,test]'
+```
+
+### Qdrant ve temel kavramlar
+
+Qdrant, embedding vektörlerini saklayıp cosine similarity ile en yakın
+vektörleri bulan vektör veritabanıdır. Bu deney mevcut MongoDB ve Redash
+servislerinden bağımsız [ayrı Compose dosyasını](docker-compose.vector-experiment.yml)
+kullanır. Resmî Qdrant image'ı yalnız `127.0.0.1:6333` üzerinde yayınlanır ve
+veri `qdrant_experiment_data` isimli kalıcı Docker volume'unda tutulur.
+
+- **Collection:** Aynı vektör şemasındaki point'lerin kümesi; ilişkisel
+  veritabanındaki tabloya benzetilebilir.
+- **Point:** Bir makaleyi temsil eden kayıt; kimlik, vector ve payload taşır.
+- **Vector:** Makale metninin anlamını temsil eden 384 kayan noktalı sayı.
+- **Payload:** UID, başlık, dergi, yıl, subjects, deney grubu ve kısa abstract
+  önizlemesi gibi okunabilir metadata.
+- **Vector dimension:** Her vector içindeki sayı adedi; bu modelde 384'tür.
+- **Distance metric:** Bu collection cosine kullanır. Cosine similarity skoru
+  vektör yönlerinin yakınlığını sıralar; doğruluk yüzdesi değildir.
+
+Qdrant'ı başlatıp health durumunu görün:
+
+```bash
+docker compose -f docker-compose.vector-experiment.yml up -d
+docker compose -f docker-compose.vector-experiment.yml ps
+curl http://127.0.0.1:6333/healthz
+```
+
+Alt adımlar ayrı ayrı çalıştırılabilir:
+
+```bash
+# Kontrollü seçimi, UID'leri ve seçim nedenlerini gösterir.
+PYTHONPATH=src python -m ulakbim_analysis.application.select_vector_experiment
+
+# Yalnız seçilen makaleleri embedding'e çevirip collection'a yükler.
+PYTHONPATH=src python -m ulakbim_analysis.application.load_vector_experiment
+
+# Bir deney makalesini, kendisini sonuçtan çıkararak arar.
+PYTHONPATH=src python -m ulakbim_analysis.application.search_vector_experiment \
+  --uid WOS:001140573400001
+
+# Serbest metin sorgusu çalıştırır.
+PYTHONPATH=src python -m ulakbim_analysis.application.search_vector_experiment \
+  --text "perovskite solar cell stability"
+
+# Tüm seçili makalelerin ilk beş sonucunu Markdown ve CSV'ye yazar.
+PYTHONPATH=src python -m ulakbim_analysis.application.report_vector_experiment
+```
+
+Yükleme ve raporlama tek komutla da tekrarlanabilir:
+
+```bash
+PYTHONPATH=src python -m ulakbim_analysis.application.run_vector_experiment
+```
+
+Sonuçlar `reports/vector_similarity_experiment.md` ve
+`reports/vector_similarity_results.csv` dosyalarındadır. CSV'deki
+`manual_label` (`net_benzer`, `gri_alan`, `ilgisiz`) ve `reviewer_note` alanları
+bilerek boş bırakılır; evrensel ve keyfî bir otomatik skor eşiği uygulanmaz.
+
 ## Aşamalı import ve idempotency kontrolü
 
 Önce MongoDB'nin `healthy` olduğundan emin olun. Küçük örneklerle doğrulama

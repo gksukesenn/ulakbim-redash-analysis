@@ -1,6 +1,9 @@
 from typing import Any, Dict, List, Optional
 
-from ulakbim_analysis.domain.publication import Publication
+from ulakbim_analysis.domain.publication import (
+    ABSTRACT_SUSPICIOUS_LENGTH_THRESHOLD,
+    Publication,
+)
 
 
 def as_list(value: Any) -> List[Any]:
@@ -245,6 +248,33 @@ def extract_keywords(keywords_data: Any) -> List[str]:
     return unique_texts(keyword_values)
 
 
+def extract_abstract(abstracts_data: Any) -> Optional[str]:
+    """
+    Abstract metnini tek paragraf veya paragraf listesi
+    biçimlerinden çıkarıp tek bir metne dönüştürür.
+    """
+
+    abstracts = as_dict(abstracts_data)
+    abstract_items = as_list(abstracts.get("abstract"))
+    paragraph_values = []
+
+    for abstract_item in abstract_items:
+        abstract = as_dict(abstract_item)
+        abstract_text = as_dict(abstract.get("abstract_text"))
+        paragraphs = as_list(abstract_text.get("p"))
+
+        for paragraph in paragraphs:
+            cleaned_paragraph = clean_text(paragraph)
+
+            if cleaned_paragraph is not None:
+                paragraph_values.append(cleaned_paragraph)
+
+    if not paragraph_values:
+        return None
+
+    return " ".join(paragraph_values)
+
+
 def parse_publication_year(value: Any) -> Optional[int]:
     """
     Yayın yılını tam sayıya dönüştürür.
@@ -296,6 +326,11 @@ def map_publication(raw_publication: Dict[str, Any]) -> Publication:
     )
     pub_info = as_dict(summary.get("pub_info"))
 
+    abstract = extract_abstract(
+        fullrecord_metadata.get("abstracts")
+    )
+    abstract_length = len(abstract) if abstract is not None else 0
+
     uid = clean_text(raw_publication.get("UID"))
 
     if uid is None:
@@ -319,6 +354,11 @@ def map_publication(raw_publication: Dict[str, Any]) -> Publication:
         ),
         journal_gold_open_access=parse_gold_open_access(
             pub_info.get("journal_oas_gold")
+        ),
+        abstract=abstract,
+        abstract_length=abstract_length,
+        abstract_is_suspicious=(
+            abstract_length > ABSTRACT_SUSPICIOUS_LENGTH_THRESHOLD
         ),
         institutions=extract_institutions(
             fullrecord_metadata.get("addresses")
